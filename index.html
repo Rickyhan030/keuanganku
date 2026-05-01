@@ -233,10 +233,15 @@ padding:15px;
 font-size:30px;
 }
 }
+canvas{
+margin-top:20px;
+max-height:300px;
+}
 </style>
 </head>
 <body>
 
+<div id="homePage">
 <div class="container">
 
 <div class="header">
@@ -287,7 +292,13 @@ font-size:30px;
 
 <button onclick="tambah()">Simpan Transaksi</button>
 </div>
+<div class="card">
 
+<h3>📊 Statistik Keuangan</h3>
+
+<canvas id="financeChart"></canvas>
+
+</div>
 <div class="card">
 <h3>📋 Riwayat Transaksi</h3>
 
@@ -297,20 +308,80 @@ font-size:30px;
 <div class="bottom-space"></div>
 
 </div>
+</div>
+<div id="laporanPage" style="display:none">
 
+<div class="card">
+<h3>📊 Laporan Keuangan</h3>
+
+<p style="margin-top:10px">
+Total transaksi tersimpan:
+<span id="totalTransaksi">0</span>
+</p>
+
+<p style="margin-top:10px">
+Total pemasukan:
+<span id="lapIncome">Rp 0</span>
+</p>
+
+<p style="margin-top:10px">
+Total pengeluaran:
+<span id="lapExpense">Rp 0</span>
+</p>
+
+</div>
+
+</div>
+<div id="walletPage" style="display:none">
+
+<div class="card">
+<h3>💳 Wallet</h3>
+
+<p style="margin-top:10px">
+Saldo utama aplikasi Anda.
+</p>
+
+<h2 id="walletSaldo" style="margin-top:15px">
+Rp 0
+</h2>
+
+</div>
+
+</div>
+<div id="settingPage" style="display:none">
+
+<div class="card">
+<h3>⚙️ Pengaturan</h3>
+
+<button onclick="resetData()"
+style="
+background:#ef4444;
+margin-top:15px;
+">
+Reset Semua Data
+</button>
+
+</div>
+
+</div>
 <div class="navbar">
-<div class="nav-item active-nav">
+
+<div class="nav-item active-nav" onclick="showPage('home',this)">
 🏠<br>Home
 </div>
-<div class="nav-item">
+
+<div class="nav-item" onclick="showPage('laporan',this)">
 📊<br>Laporan
 </div>
-<div class="nav-item">
+
+<div class="nav-item" onclick="showPage('wallet',this)">
 💳<br>Wallet
 </div>
-<div class="nav-item">
+
+<div class="nav-item" onclick="showPage('setting',this)">
 ⚙️<br>Setting
 </div>
+
 </div>
 
 <script>
@@ -319,7 +390,7 @@ let transaksi = JSON.parse(localStorage.getItem('transaksi')) || [];
 
 function tambah(){
 
-let nama = document.getElementById('nama').value;
+let nama = document.getElementById('nama').value.trim();
 let jumlah = document.getElementById('jumlah').value;
 let jenis = document.getElementById('jenis').value;
 let kategori = document.getElementById('kategori').value;
@@ -329,46 +400,59 @@ alert('Lengkapi data');
 return;
 }
 
-transaksi.unshift({
-nama,
+let dataBaru = {
+nama:nama,
 jumlah:Number(jumlah),
-jenis,
-kategori
-});
+jenis:jenis,
+kategori:kategori
+};
 
-localStorage.setItem('transaksi',JSON.stringify(transaksi));
+transaksi.unshift(dataBaru);
 
+localStorage.setItem(
+'transaksi',
+JSON.stringify(transaksi)
+);
 
 document.getElementById('nama').value='';
 document.getElementById('jumlah').value='';
 
 render();
 }
-
+let financeChart;
 function render(){
 
 let list = document.getElementById('list');
+
 list.innerHTML='';
 
 let totalIncome = 0;
 let totalExpense = 0;
 
-if(transaksi.length===0){
-list.innerHTML=`<div class="empty">Belum ada transaksi</div>`;
+if(transaksi.length === 0){
+
+list.innerHTML = `
+<div class="empty">
+Belum ada transaksi
+</div>
+`;
+
 }
 
-transaksi.forEach((t)=>{
+transaksi.forEach((t,i)=>{
 
-if(t.jenis==='income'){
+if(t.jenis === 'income'){
 totalIncome += t.jumlah;
 }else{
 totalExpense += t.jumlah;
 }
 
 list.innerHTML += `
+
 <div class="transaction">
 
 <div class="transaction-left">
+
 <div class="icon ${t.jenis==='income' ? 'income-bg' : 'expense-bg'}">
 ${t.jenis==='income' ? '💰' : '💸'}
 </div>
@@ -377,29 +461,107 @@ ${t.jenis==='income' ? '💰' : '💸'}
 <h4>${t.nama}</h4>
 <small>${t.kategori}</small>
 </div>
+
 </div>
+
+<div style="text-align:right">
 
 <div class="${t.jenis}">
-${t.jenis==='income' ? '+' : '-'} Rp ${t.jumlah.toLocaleString('id-ID')}
+${t.jenis==='income' ? '+' : '-'}
+Rp ${Number(t.jumlah).toLocaleString('id-ID')}
+</div>
+
+<button onclick="hapus(${i})"
+style="
+margin-top:5px;
+padding:6px 10px;
+border:none;
+border-radius:10px;
+background:#ef4444;
+color:white;
+font-size:12px;
+cursor:pointer;
+">
+Hapus
+</button>
+
 </div>
 
 </div>
+
 `;
+
 });
 
-let saldo = totalIncome-totalExpense;
-
+let saldo = totalIncome - totalExpense;
 
 document.getElementById('saldo').innerText =
 'Rp ' + saldo.toLocaleString('id-ID');
 
-
 document.getElementById('income').innerText =
 'Rp ' + totalIncome.toLocaleString('id-ID');
 
-
 document.getElementById('expense').innerText =
 'Rp ' + totalExpense.toLocaleString('id-ID');
+renderChart(totalIncome,totalExpense);
+
+}
+function renderChart(totalIncome,totalExpense){
+
+const ctx = document.getElementById('financeChart');
+
+if(financeChart){
+financeChart.destroy();
+}
+
+financeChart = new Chart(ctx, {
+
+type:'doughnut',
+
+data:{
+labels:['Pemasukan','Pengeluaran'],
+
+datasets:[{
+data:[totalIncome,totalExpense],
+
+backgroundColor:[
+'#22c55e',
+'#ef4444'
+],
+
+borderWidth:0,
+borderRadius:8
+}]
+},
+
+options:{
+responsive:true,
+
+plugins:{
+legend:{
+labels:{
+color:'white'
+}
+}
+}
+}
+
+});
+
+}
+function hapus(i){
+
+if(!confirm('Hapus transaksi ini?')) return;
+
+transaksi.splice(i,1);
+
+localStorage.setItem(
+'transaksi',
+JSON.stringify(transaksi)
+);
+
+render();
+
 }
 
 render();
@@ -437,7 +599,89 @@ document.getElementById('installBtn').addEventListener('click', async () => {
 
   document.getElementById('installBtn').style.display = 'none';
 });
+
 </script>
+<script>
+
+function showPage(page,el){
+
+document.getElementById('homePage').style.display='none';
+document.getElementById('laporanPage').style.display='none';
+document.getElementById('walletPage').style.display='none';
+document.getElementById('settingPage').style.display='none';
+
+document.querySelectorAll('.nav-item')
+.forEach(nav=>nav.classList.remove('active-nav'));
+
+el.classList.add('active-nav');
+
+if(page==='home'){
+document.getElementById('homePage').style.display='block';
+}
+
+if(page==='laporan'){
+document.getElementById('laporanPage').style.display='block';
+}
+
+if(page==='wallet'){
+document.getElementById('walletPage').style.display='block';
+}
+
+if(page==='setting'){
+document.getElementById('settingPage').style.display='block';
+}
+
+updateLaporan();
+
+}
+
+function updateLaporan(){
+
+let totalIncome = 0;
+let totalExpense = 0;
+
+transaksi.forEach(t=>{
+
+if(t.jenis==='income'){
+totalIncome += t.jumlah;
+}else{
+totalExpense += t.jumlah;
+}
+
+});
+
+document.getElementById('totalTransaksi').innerText =
+transaksi.length;
+
+document.getElementById('lapIncome').innerText =
+'Rp ' + totalIncome.toLocaleString('id-ID');
+
+document.getElementById('lapExpense').innerText =
+'Rp ' + totalExpense.toLocaleString('id-ID');
+
+document.getElementById('walletSaldo').innerText =
+'Rp ' + (totalIncome-totalExpense)
+.toLocaleString('id-ID');
+
+}
+
+function resetData(){
+
+if(!confirm('Hapus semua data?')) return;
+
+transaksi = [];
+
+localStorage.removeItem('transaksi');
+
+render();
+
+updateLaporan();
+
+alert('Data berhasil dihapus');
+
+}
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>
-```
